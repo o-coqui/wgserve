@@ -40,3 +40,11 @@ cargo {
     apiLevel = 21
     profile = "release"
 }
+
+// rust-android-gradle does not automatically make Android assemble tasks
+// depend on cargoBuild. Build the Rust JNI library before Java/native packaging.
+tasks.whenTaskAdded { task ->
+    if (task.name == 'preBuild') {
+        task.dependsOn 'cargoBuild'
+    }
+}
