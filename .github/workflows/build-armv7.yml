@@ -97,3 +97,5 @@ jobs:
           prerelease: true
           generate_release_notes: true
           files: app/build/outputs/apk/release/wgserve-armv7.apk
+
+# Trigger a fresh run after configuring signing secrets.
