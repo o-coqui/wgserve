@@ -34,8 +34,8 @@ apply plugin: 'org.mozilla.rust-android-gradle.rust-android'
 cargo {
     module  = "../wgserv"
     libname = "wgserv"
-    // targets = ["arm", "arm64", "x86", "x86_64"]
-    targets = ["arm64"]
+    // The DCIW3930 uses a 32-bit ARM userspace (armeabi-v7a).
+    targets = ["arm"]
     apiLevel = 21
     profile = "release"
 }
