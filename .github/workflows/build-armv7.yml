@@ -6,6 +6,9 @@ on:
       - armv7-build
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -55,9 +58,18 @@ jobs:
             exit 1
           fi
 
-      - name: Upload ARMv7 APK
+      - name: Upload ARMv7 APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: wgserve-armv7-apk
           path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: armv7-build-${{ github.run_number }}
+          name: wgserve ARMv7 build ${{ github.run_number }}
+          prerelease: true
+          generate_release_notes: true
+          files: app/build/outputs/apk/release/*.apk
