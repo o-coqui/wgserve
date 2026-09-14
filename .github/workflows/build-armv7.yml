@@ -38,10 +38,10 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
-      - name: Build release APK
+      - name: Build Rust JNI library and APK
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/25.2.9519653
-        run: ./gradlew assembleRelease --stacktrace
+        run: ./gradlew cargoBuild assembleRelease --stacktrace
 
       - name: Verify APK ABI
         run: |
