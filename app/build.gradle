@@ -5,6 +5,7 @@ plugins {
 android {
     namespace 'org.vi_server.wgserver'
     compileSdk 32
+    ndkVersion "25.2.9519653"
 
     defaultConfig {
         applicationId "org.vi_server.wgserver"
