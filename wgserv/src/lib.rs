@@ -44,6 +44,7 @@ struct Config {
     pub tcp_buffer_size: usize,
     pub incoming_udp: Vec<PortForward>,
     pub incoming_tcp: Vec<PortForward>,
+    pub outgoing_tcp: Vec<OutgoingPortForward>,
 
     pub transmit_queue_capacity: usize,
 }
@@ -60,6 +61,20 @@ impl From<PortForward> for libwgslirpy::router::PortForward {
             host: value.host,
             src: value.src,
             dst: value.dst
+        }
+    }
+}
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+struct OutgoingPortForward {
+    pub src: SocketAddr,
+    pub dst: SocketAddr,
+}
+impl From<OutgoingPortForward> for libwgslirpy::router::OutgoingPortForward {
+    fn from(value: OutgoingPortForward) -> Self {
+        libwgslirpy::router::OutgoingPortForward {
+            src: value.src,
+            dst: value.dst,
         }
     }
 }
@@ -164,6 +179,7 @@ pub extern "system" fn Java_org_vi_1server_wgserver_Native_run(
         tcp_buffer_size: config.tcp_buffer_size,
         incoming_udp: config.incoming_udp.into_iter().map(|x|x.into()).collect(),
         incoming_tcp: config.incoming_tcp.into_iter().map(|x|x.into()).collect(),
+        outgoing_tcp: config.outgoing_tcp.into_iter().map(|x|x.into()).collect(),
     };
     let wg_config = libwgslirpy::wg::Opts {
         private_key: libwgslirpy::parsebase64_32(&config.private_key).unwrap().into(),
@@ -240,6 +256,16 @@ pub extern "system" fn Java_org_vi_1server_wgserver_Native_getSampleConfig(
                 host: "0.0.0.0:2222".parse().unwrap(),
                 src: None,
                 dst: "10.0.2.15:22".parse().unwrap(),
+            },
+        ],
+        outgoing_tcp: vec![
+            OutgoingPortForward {
+                src: "192.168.1.5:22".parse().unwrap(),
+                dst: "192.168.1.5:8022".parse().unwrap(),
+            },
+            OutgoingPortForward {
+                src: "192.168.1.5:445".parse().unwrap(),
+                dst: "192.168.1.5:4445".parse().unwrap(),
             },
         ],
         transmit_queue_capacity: 128,
