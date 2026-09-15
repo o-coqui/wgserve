@@ -38,6 +38,23 @@ jobs:
         with:
           targets: armv7-linux-androideabi
 
+      - name: Prepare patched wgslirpy
+        run: |
+          set -e
+          git clone https://github.com/vi/wgslirpy.git wgslirpy
+          git -C wgslirpy checkout 6805933f3e6f88f3cd8d1106a135d7d53eb198ea
+          python3 scripts/patch-wgslirpy-portmap.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("wgserv/Cargo.toml")
+          s = p.read_text()
+          old = 'libwgslirpy = "0.2.0"'
+          new = 'libwgslirpy = { path = "../wgslirpy/crates/libwgslirpy" }'
+          if old not in s:
+              raise SystemExit("libwgslirpy dependency line not found")
+          p.write_text(s.replace(old, new, 1))
+          PY
+
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
 
@@ -97,5 +114,3 @@ jobs:
           prerelease: true
           generate_release_notes: true
           files: app/build/outputs/apk/release/wgserve-armv7.apk
-
-# Fix ABI regex: the APK path contains a literal .so suffix, so grep needs one escaped dot.
