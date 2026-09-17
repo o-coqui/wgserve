@@ -19,6 +19,10 @@ public class Serv extends Service {
     private static long instance = 0;
     private static PowerManager.WakeLock wl;
 
+    public static boolean isRunning() {
+        return instance != 0;
+    }
+
     @Override
     public IBinder onBind(Intent intent) {
         return null;
