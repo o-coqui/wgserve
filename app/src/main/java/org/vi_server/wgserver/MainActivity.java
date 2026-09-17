@@ -1,9 +1,9 @@
 package org.vi_server.wgserver;
 
-
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Build;
 import android.os.Bundle;
 import android.widget.Button;
@@ -11,6 +11,8 @@ import android.widget.EditText;
 import android.widget.TextView;
 
 public class MainActivity extends Activity {
+    private static final String PREFS_NAME = "wgserve_prefs";
+    private static final String CONFIG_KEY = "config";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -18,14 +20,21 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
 
         Context ctx = this;
+        EditText configText = findViewById(R.id.tConfig);
+
+        // Restore the last successfully started configuration after app/process/reboot.
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        String savedConfig = prefs.getString(CONFIG_KEY, null);
+        if (savedConfig != null) {
+            configText.setText(savedConfig);
+        }
 
         {
             Button b = findViewById(R.id.bStart);
             b.setOnClickListener(view -> {
                 Intent intent = new Intent(ctx, Serv.class);
 
-                EditText t = findViewById(R.id.tConfig);
-                String config = t.getText().toString();
+                String config = configText.getText().toString();
 
                 long instance = Native.create();
                 String ret = Native.setConfig(instance, config);
@@ -33,7 +42,11 @@ public class MainActivity extends Activity {
                 TextView s = findViewById(R.id.tStatus);
                 if (ret != null && !ret.isEmpty()) {
                     s.setText(ret);
+                    Native.destroy(instance);
                 } else {
+                    // Persist only a configuration that was accepted by the native parser.
+                    prefs.edit().putString(CONFIG_KEY, config).apply();
+
                     intent.putExtra("instance", instance);
 
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -43,7 +56,6 @@ public class MainActivity extends Activity {
                     }
                     s.setText("started");
                 }
-
             });
         }
         {
@@ -59,8 +71,7 @@ public class MainActivity extends Activity {
         {
             Button b = findViewById(R.id.bSampleConfig);
             b.setOnClickListener(view -> {
-                EditText t = findViewById(R.id.tConfig);
-                t.setText(Native.getSampleConfig());
+                configText.setText(Native.getSampleConfig());
             });
         }
     }
