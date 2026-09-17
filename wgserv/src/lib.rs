@@ -32,6 +32,9 @@ struct Config {
     #[serde(default)]
     debug: bool,
 
+    #[serde(default)]
+    autostart: bool,
+
     pub private_key: String,
     pub peer_key: String,
     pub peer_endpoint: Option<SocketAddr>,
@@ -144,6 +147,22 @@ pub extern "system" fn Java_org_vi_1server_wgserver_Native_setConfig(
 }
 
 #[no_mangle]
+pub extern "system" fn Java_org_vi_1server_wgserver_Native_getAutostart(
+    mut env: JNIEnv,
+    _class: JClass,
+    input: JString,
+) -> jstring {
+    let input: String = env
+        .get_string(&input)
+        .expect("Couldn't get java string!")
+        .into();
+    match toml::from_str::<Config>(&input) {
+        Ok(x) => env.new_string(if x.autostart { "true" } else { "false" }).unwrap().into_raw(),
+        Err(e) => env.new_string(format!("ERROR: {}", e)).unwrap().into_raw(),
+    }
+}
+
+#[no_mangle]
 pub extern "system" fn Java_org_vi_1server_wgserver_Native_run(
     env: JNIEnv,
     _class: JClass,
@@ -232,6 +251,7 @@ pub extern "system" fn Java_org_vi_1server_wgserver_Native_getSampleConfig(
 ) -> jstring {
     let sample_config = Config {
         debug: false,
+        autostart: false,
         private_key: "SG43Zi0wGp4emfJ/XpTnnmtnK8SSjjIHOc3Zh37c928=".to_owned(),
         peer_key: "rPpCjWzIv/yAtZZi+C/pVprie8D0QaGlPtJXlDi6bmI=".to_owned(),
         peer_endpoint: Some("192.168.0.185:9796".parse().unwrap()),
