@@ -33,19 +33,35 @@ public class Serv extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (instance != 0) {
             Native.destroy(instance);
+            instance = 0;
         }
-        instance = intent.getLongExtra("instance", 0);
-        if (instance == 0) {
-            this.stopForeground(true);
-            this.stopSelf();
-            return super.onStartCommand(intent, flags, startId);
+
+        long suppliedInstance = intent != null ? intent.getLongExtra("instance", 0) : 0;
+        if (suppliedInstance != 0) {
+            instance = suppliedInstance;
+        } else {
+            String config = ConfigStore.load(this);
+            if (config == null || config.isEmpty()) {
+                Log.e("WgServer", "No saved configuration");
+                stopSelf();
+                return START_NOT_STICKY;
+            }
+
+            instance = Native.create();
+            String ret = Native.setConfig(instance, config);
+            if (ret != null && !ret.isEmpty()) {
+                Log.e("WgServer", "Invalid saved configuration: " + ret);
+                Native.destroy(instance);
+                instance = 0;
+                stopSelf();
+                return START_NOT_STICKY;
+            }
         }
 
         Intent notificationIntent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent =
                 PendingIntent.getActivity(this, 0, notificationIntent,
                         PendingIntent.FLAG_IMMUTABLE);
-
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             int importance = NotificationManager.IMPORTANCE_LOW;
@@ -56,8 +72,6 @@ public class Serv extends Service {
         }
 
         CharSequence notiftext = getText(R.string.service_desc);
-
-
         nb = new Notification.Builder(this)
                 .setContentTitle(getText(R.string.app_name))
                 .setContentText(notiftext)
@@ -68,38 +82,35 @@ public class Serv extends Service {
             nb.setChannelId(CHANNEL_DEFAULT_IMPORTANCE);
         }
 
-        Notification notification = nb.build();
+        startForeground(ONGOING_NOTIFICATION_ID, nb.build());
 
-        startForeground(ONGOING_NOTIFICATION_ID, notification);
-
-        PowerManager pm = (PowerManager)this.getSystemService(
-                Context.POWER_SERVICE);
+        PowerManager pm = (PowerManager)this.getSystemService(Context.POWER_SERVICE);
         wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "wgserver:wl");
         wl.acquire();
 
+        final long runningInstance = instance;
         new Thread(() -> {
-            String ret2 = Native.run(instance);
+            String ret2 = Native.run(runningInstance);
             if (ret2 == null || ret2.isEmpty()) {
                 Log.i("WgServer","Background thread exited without signaling failure");
             } else {
-                Log.w("WgServer", "Background thread existed with error: " + ret2);
+                Log.w("WgServer", "Background thread exited with error: " + ret2);
             }
             this.stopSelf();
         }).start();
 
-        return super.onStartCommand(intent, flags, startId);
+        return START_NOT_STICKY;
     }
 
     @Override
     public void onDestroy() {
-
         if (wl != null) {
             wl.release();
             wl = null;
         }
         if (instance != 0) {
             Native.destroy(instance);
-            instance=0;
+            instance = 0;
         }
         super.onDestroy();
     }
