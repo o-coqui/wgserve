@@ -252,42 +252,18 @@ pub extern "system" fn Java_org_vi_1server_wgserver_Native_getSampleConfig(
     let sample_config = Config {
         debug: false,
         autostart: false,
-        private_key: "SG43Zi0wGp4emfJ/XpTnnmtnK8SSjjIHOc3Zh37c928=".to_owned(),
-        peer_key: "rPpCjWzIv/yAtZZi+C/pVprie8D0QaGlPtJXlDi6bmI=".to_owned(),
-        peer_endpoint: Some("192.168.0.185:9796".parse().unwrap()),
+        private_key: "SERVER_PRIVATE_KEY".to_owned(),
+        peer_key: "CLIENT_PUBLIC_KEY".to_owned(),
+        peer_endpoint: None,
         keepalive_interval: Some(15),
         bind_ip_port: "0.0.0.0:9797".parse().unwrap(),
-        dns_addr: Some("10.0.2.1:53".parse().unwrap()),
-        pingable: Some("10.0.2.1".parse().unwrap()),
+        dns_addr: None,
+        pingable: None,
         mtu: 1420,
         tcp_buffer_size: 65536,
-        incoming_udp: vec![PortForward {
-            host: "0.0.0.0:8053".parse().unwrap(),
-            src: Some("99.99.99.99:99".parse().unwrap()),
-            dst: "10.0.2.15:5353".parse().unwrap(),
-        }],
-        incoming_tcp: vec![
-            PortForward {
-                host: "0.0.0.0:8080".parse().unwrap(),
-                src: None,
-                dst: "10.0.2.15:80".parse().unwrap(),
-            },
-            PortForward {
-                host: "0.0.0.0:2222".parse().unwrap(),
-                src: None,
-                dst: "10.0.2.15:22".parse().unwrap(),
-            },
-        ],
-        outgoing_tcp: vec![
-            OutgoingPortForward {
-                src: "192.168.1.5:22".parse().unwrap(),
-                dst: "192.168.1.5:8022".parse().unwrap(),
-            },
-            OutgoingPortForward {
-                src: "192.168.1.5:445".parse().unwrap(),
-                dst: "192.168.1.5:4445".parse().unwrap(),
-            },
-        ],
+        incoming_udp: vec![],
+        incoming_tcp: vec![],
+        outgoing_tcp: vec![],
         transmit_queue_capacity: 128,
     };
     let output = env
