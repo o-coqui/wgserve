@@ -37,7 +37,13 @@
         <receiver
             android:name=".ControlReceiver"
             android:enabled="true"
-            android:exported="true" />
+            android:exported="true">
+            <intent-filter>
+                <action android:name="org.vi_server.wgserver.START" />
+                <action android:name="org.vi_server.wgserver.STOP" />
+                <action android:name="org.vi_server.wgserver.STATUS" />
+            </intent-filter>
+        </receiver>
     </application>
 
     <uses-permission android:name="android.permission.INTERNET"/>
