@@ -49,4 +49,28 @@ assert old in s
 s = s.replace(old, new, 1)
 
 serve_tcp.write_text(s)
-print("Patched wgslirpy for outgoing TCP destination rewrites")
+
+# Refresh the remembered WireGuard peer endpoint whenever a valid packet is
+# received. With peer_endpoint = null, the client's UDP source port may change
+# after a disconnect/reconnect; keeping the old endpoint causes handshake
+# responses to be sent to the stale port.
+wg = Path("wgslirpy/crates/libwgslirpy/src/wg.rs")
+w = wg.read_text()
+old = """                    if !matches!(tr_inner, TunnResult::Err(..)) {
+                        if last_seen_recv_address.is_some()
+                            && current_peer_addr.is_none()
+                            && static_peer_addr.is_none()
+                        {
+                            current_peer_addr = last_seen_recv_address;
+                        }
+                    }"""
+new = """                    if !matches!(tr_inner, TunnResult::Err(..)) {
+                        if last_seen_recv_address.is_some() && static_peer_addr.is_none() {
+                            current_peer_addr = last_seen_recv_address;
+                        }
+                    }"""
+assert old in w
+w = w.replace(old, new, 1)
+wg.write_text(w)
+
+print("Patched wgslirpy for outgoing TCP destination rewrites and peer endpoint refresh")
