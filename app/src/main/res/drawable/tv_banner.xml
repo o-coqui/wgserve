@@ -1,16 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item>
+
+    <!-- Explicit 16:9 banner canvas. -->
+    <item
+        android:width="320dp"
+        android:height="180dp">
         <shape android:shape="rectangle">
             <solid android:color="#202020" />
         </shape>
     </item>
 
-    <!-- Android TV banner: 16:9 canvas with the existing icon centered.
-         The side margins use the same gray background as the banner. -->
+    <!-- Keep the existing wgserve icon centered, with the same gray filling
+         the remaining space on both sides. -->
     <item
         android:width="96dp"
         android:height="96dp"
         android:gravity="center"
         android:drawable="@drawable/wgserver" />
+
 </layer-list>
