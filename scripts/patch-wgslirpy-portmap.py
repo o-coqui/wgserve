@@ -56,6 +56,34 @@ serve_tcp.write_text(s)
 # responses to be sent to the stale port.
 wg = Path("wgslirpy/crates/libwgslirpy/src/wg.rs")
 w = wg.read_text()
+
+# Recreate only BoringTun's Tunn state after ConnectionExpired. Keep the
+# Tokio UDP socket, router and Android service alive; only the expired
+# WireGuard handshake/session state is replaced.
+old = """use boringtun::noise::TunnResult;"""
+new = """use boringtun::noise::{errors::WireGuardError, TunnResult};"""
+assert old in w
+w = w.replace(old, new, 1)
+
+old = """                        TunnResult::Err(e) => {
+                            error!("boringturn error: {:?}", e);
+                        }"""
+new = """                        TunnResult::Err(WireGuardError::ConnectionExpired) => {
+                            error!("boringturn error: ConnectionExpired; recreating Tunn");
+                            wg = boringtun::noise::Tunn::new(
+                                self.private_key.clone(),
+                                self.peer_key,
+                                None,
+                                self.keepalive_interval,
+                                0,
+                                None,
+                            );
+                        }
+                        TunnResult::Err(e) => {
+                            error!("boringturn error: {:?}", e);
+                        }"""
+assert old in w
+w = w.replace(old, new, 1)
 old = """                    if !matches!(tr_inner, TunnResult::Err(..)) {
                         if last_seen_recv_address.is_some()
                             && current_peer_addr.is_none()
