@@ -6,6 +6,9 @@ on:
       - armv7-build
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -14,19 +17,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java 11
-        uses: actions/setup-java@v4
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '11'
-          cache: gradle
+          java-version: '17'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: ''
 
       - name: Install Android SDK components
         run: |
-          sdkmanager "platforms;android-32" "build-tools;32.0.0" "ndk;25.2.9519653"
+          sdkmanager "platform-tools" "platforms;android-32" "build-tools;32.0.0" "ndk;25.2.9519653"
           yes | sdkmanager --licenses >/dev/null || true
 
       - name: Set up Rust
@@ -34,23 +38,79 @@ jobs:
         with:
           targets: armv7-linux-androideabi
 
-      - name: Build release APK
-        run: ./gradlew assembleRelease --stacktrace --no-daemon
-
-      - name: Verify APK architecture
+      - name: Prepare patched wgslirpy
         run: |
           set -e
-          APK=$(find app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -print -quit)
+          git clone https://github.com/vi/wgslirpy.git wgslirpy
+          git -C wgslirpy checkout 6805933f3e6f88f3cd8d1106a135d7d53eb198ea
+          python3 scripts/patch-wgslirpy-portmap.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("wgserv/Cargo.toml")
+          s = p.read_text()
+          old = 'libwgslirpy = "0.2.0"'
+          new = 'libwgslirpy = { path = "../wgslirpy/crates/libwgslirpy" }'
+          if old not in s:
+              raise SystemExit("libwgslirpy dependency line not found")
+          p.write_text(s.replace(old, new, 1))
+          PY
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Build Rust JNI library and APK
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/25.2.9519653
+        run: ./gradlew cargoBuild assembleRelease --stacktrace
+
+      - name: Verify APK ABI
+        run: |
+          set -e
+          APK=$(find app/build/outputs/apk/release -name '*-unsigned.apk' -print -quit)
           test -n "$APK"
+          echo "APK: $APK"
           unzip -l "$APK" | grep -E 'lib/armeabi-v7a/.*\.so$'
           if unzip -l "$APK" | grep -q 'lib/arm64-v8a/'; then
-            echo 'Unexpected ARM64 libraries found in ARMv7 APK'
+            echo 'ERROR: APK contains ARM64 libraries; this build must be ARMv7 only.'
             exit 1
           fi
 
-      - name: Upload APK
+      - name: Decode signing keystore
+        env:
+          SIGNING_KEYSTORE_B64: ${{ secrets.SIGNING_KEYSTORE_B64 }}
+        run: |
+          test -n "$SIGNING_KEYSTORE_B64"
+          printf '%s' "$SIGNING_KEYSTORE_B64" | base64 --decode > wgserve-release.jks
+
+      - name: Sign APK
+        env:
+          STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: |
+          set -e
+          UNSIGNED=$(find app/build/outputs/apk/release -name '*-unsigned.apk' -print -quit)
+          test -n "$UNSIGNED"
+          $ANDROID_HOME/build-tools/32.0.0/apksigner sign \
+            --ks wgserve-release.jks \
+            --ks-key-alias wgserve \
+            --ks-pass pass:"$STORE_PASSWORD" \
+            --key-pass pass:"$KEY_PASSWORD" \
+            --out app/build/outputs/apk/release/wgserve-armv7.apk \
+            "$UNSIGNED"
+          $ANDROID_HOME/build-tools/32.0.0/apksigner verify --verbose app/build/outputs/apk/release/wgserve-armv7.apk
+
+      - name: Upload ARMv7 APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: wgserve-armv7-release
-          path: app/build/outputs/apk/release/*.apk
+          name: wgserve-armv7-apk
+          path: app/build/outputs/apk/release/wgserve-armv7.apk
           if-no-files-found: error
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: armv7-build-${{ github.run_number }}
+          name: wgserve ARMv7 build ${{ github.run_number }}
+          prerelease: true
+          generate_release_notes: true
+          files: app/build/outputs/apk/release/wgserve-armv7.apk

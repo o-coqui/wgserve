@@ -20,4 +20,6 @@ public class Native {
     public static native void destroy(long instance);
 
     public static native String getSampleConfig();
+
+    public static native String getAutostart(String toml_config);
 }

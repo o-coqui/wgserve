@@ -32,6 +32,9 @@ struct Config {
     #[serde(default)]
     debug: bool,
 
+    #[serde(default)]
+    autostart: bool,
+
     pub private_key: String,
     pub peer_key: String,
     pub peer_endpoint: Option<SocketAddr>,
@@ -44,6 +47,7 @@ struct Config {
     pub tcp_buffer_size: usize,
     pub incoming_udp: Vec<PortForward>,
     pub incoming_tcp: Vec<PortForward>,
+    pub outgoing_tcp: Vec<OutgoingPortForward>,
 
     pub transmit_queue_capacity: usize,
 }
@@ -60,6 +64,20 @@ impl From<PortForward> for libwgslirpy::router::PortForward {
             host: value.host,
             src: value.src,
             dst: value.dst
+        }
+    }
+}
+#[derive(serde::Deserialize, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+struct OutgoingPortForward {
+    pub src: SocketAddr,
+    pub dst: SocketAddr,
+}
+impl From<OutgoingPortForward> for libwgslirpy::router::OutgoingPortForward {
+    fn from(value: OutgoingPortForward) -> Self {
+        libwgslirpy::router::OutgoingPortForward {
+            src: value.src,
+            dst: value.dst,
         }
     }
 }
@@ -129,6 +147,22 @@ pub extern "system" fn Java_org_vi_1server_wgserver_Native_setConfig(
 }
 
 #[no_mangle]
+pub extern "system" fn Java_org_vi_1server_wgserver_Native_getAutostart(
+    mut env: JNIEnv,
+    _class: JClass,
+    input: JString,
+) -> jstring {
+    let input: String = env
+        .get_string(&input)
+        .expect("Couldn't get java string!")
+        .into();
+    match toml::from_str::<Config>(&input) {
+        Ok(x) => env.new_string(if x.autostart { "true" } else { "false" }).unwrap().into_raw(),
+        Err(e) => env.new_string(format!("ERROR: {}", e)).unwrap().into_raw(),
+    }
+}
+
+#[no_mangle]
 pub extern "system" fn Java_org_vi_1server_wgserver_Native_run(
     env: JNIEnv,
     _class: JClass,
@@ -164,6 +198,7 @@ pub extern "system" fn Java_org_vi_1server_wgserver_Native_run(
         tcp_buffer_size: config.tcp_buffer_size,
         incoming_udp: config.incoming_udp.into_iter().map(|x|x.into()).collect(),
         incoming_tcp: config.incoming_tcp.into_iter().map(|x|x.into()).collect(),
+        outgoing_tcp: config.outgoing_tcp.into_iter().map(|x|x.into()).collect(),
     };
     let wg_config = libwgslirpy::wg::Opts {
         private_key: libwgslirpy::parsebase64_32(&config.private_key).unwrap().into(),
@@ -216,32 +251,19 @@ pub extern "system" fn Java_org_vi_1server_wgserver_Native_getSampleConfig(
 ) -> jstring {
     let sample_config = Config {
         debug: false,
-        private_key: "SG43Zi0wGp4emfJ/XpTnnmtnK8SSjjIHOc3Zh37c928=".to_owned(),
-        peer_key: "rPpCjWzIv/yAtZZi+C/pVprie8D0QaGlPtJXlDi6bmI=".to_owned(),
-        peer_endpoint: Some("192.168.0.185:9796".parse().unwrap()),
+        autostart: false,
+        private_key: "SERVER_PRIVATE_KEY".to_owned(),
+        peer_key: "CLIENT_PUBLIC_KEY".to_owned(),
+        peer_endpoint: None,
         keepalive_interval: Some(15),
         bind_ip_port: "0.0.0.0:9797".parse().unwrap(),
-        dns_addr: Some("10.0.2.1:53".parse().unwrap()),
-        pingable: Some("10.0.2.1".parse().unwrap()),
+        dns_addr: None,
+        pingable: None,
         mtu: 1420,
         tcp_buffer_size: 65536,
-        incoming_udp: vec![PortForward {
-            host: "0.0.0.0:8053".parse().unwrap(),
-            src: Some("99.99.99.99:99".parse().unwrap()),
-            dst: "10.0.2.15:5353".parse().unwrap(),
-        }],
-        incoming_tcp: vec![
-            PortForward {
-                host: "0.0.0.0:8080".parse().unwrap(),
-                src: None,
-                dst: "10.0.2.15:80".parse().unwrap(),
-            },
-            PortForward {
-                host: "0.0.0.0:2222".parse().unwrap(),
-                src: None,
-                dst: "10.0.2.15:22".parse().unwrap(),
-            },
-        ],
+        incoming_udp: vec![],
+        incoming_tcp: vec![],
+        outgoing_tcp: vec![],
         transmit_queue_capacity: 128,
     };
     let output = env

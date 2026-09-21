@@ -1,0 +1,37 @@
+name: Sync upstream wgserve
+
+on:
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout ARMv7 branch
+        uses: actions/checkout@v4
+        with:
+          ref: armv7-build
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/vi/wgserve.git
+          git fetch upstream main
+
+      - name: Merge upstream changes
+        run: |
+          git merge --no-edit upstream/main
+
+      - name: Push updated ARMv7 branch
+        run: git push origin armv7-build
