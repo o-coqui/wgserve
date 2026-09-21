@@ -1,4 +1,4 @@
-name: Build ARMv7 APK
+name: Build release APKs
 
 on:
   push:
@@ -12,32 +12,20 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-22.04
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Java 17
-        uses: actions/setup-java@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: ''
-
+      - uses: android-actions/setup-android@v3
       - name: Install Android SDK components
         run: |
           sdkmanager "platform-tools" "platforms;android-32" "build-tools;32.0.0" "ndk;25.2.9519653"
           yes | sdkmanager --licenses >/dev/null || true
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: armv7-linux-androideabi
-
+          targets: armv7-linux-androideabi,aarch64-linux-android
       - name: Prepare patched wgslirpy
         run: |
           set -e
@@ -50,67 +38,49 @@ jobs:
           s = p.read_text()
           old = 'libwgslirpy = "0.2.0"'
           new = 'libwgslirpy = { path = "../wgslirpy/crates/libwgslirpy" }'
-          if old not in s:
-              raise SystemExit("libwgslirpy dependency line not found")
+          if old not in s: raise SystemExit("libwgslirpy dependency line not found")
           p.write_text(s.replace(old, new, 1))
           PY
-
-      - name: Make Gradle wrapper executable
-        run: chmod +x ./gradlew
-
-      - name: Build Rust JNI library and APK
+      - name: Build
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/25.2.9519653
-        run: ./gradlew cargoBuild assembleRelease --stacktrace
-
-      - name: Verify APK ABI
         run: |
-          set -e
-          APK=$(find app/build/outputs/apk/release -name '*-unsigned.apk' -print -quit)
-          test -n "$APK"
-          echo "APK: $APK"
-          unzip -l "$APK" | grep -E 'lib/armeabi-v7a/.*\.so$'
-          if unzip -l "$APK" | grep -q 'lib/arm64-v8a/'; then
-            echo 'ERROR: APK contains ARM64 libraries; this build must be ARMv7 only.'
-            exit 1
-          fi
-
-      - name: Decode signing keystore
+          chmod +x ./gradlew
+          ./gradlew cargoBuild assembleRelease --stacktrace
+      - name: Sign APKs
         env:
           SIGNING_KEYSTORE_B64: ${{ secrets.SIGNING_KEYSTORE_B64 }}
-        run: |
-          test -n "$SIGNING_KEYSTORE_B64"
-          printf '%s' "$SIGNING_KEYSTORE_B64" | base64 --decode > wgserve-release.jks
-
-      - name: Sign APK
-        env:
           STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
           set -e
-          UNSIGNED=$(find app/build/outputs/apk/release -name '*-unsigned.apk' -print -quit)
-          test -n "$UNSIGNED"
-          $ANDROID_HOME/build-tools/32.0.0/apksigner sign \
-            --ks wgserve-release.jks \
-            --ks-key-alias wgserve \
-            --ks-pass pass:"$STORE_PASSWORD" \
-            --key-pass pass:"$KEY_PASSWORD" \
-            --out app/build/outputs/apk/release/wgserve-armv7.apk \
-            "$UNSIGNED"
-          $ANDROID_HOME/build-tools/32.0.0/apksigner verify --verbose app/build/outputs/apk/release/wgserve-armv7.apk
-
-      - name: Upload ARMv7 APK artifact
-        uses: actions/upload-artifact@v4
+          printf '%s' "$SIGNING_KEYSTORE_B64" | base64 --decode > wgserve-release.jks
+          for APK in app/build/outputs/apk/release/*.apk; do
+            NAME=$(basename "$APK")
+            case "$NAME" in
+              *armeabi-v7a*) OUT="wgserve-armv7.apk" ;;
+              *arm64-v8a*) OUT="wgserve-arm64.apk" ;;
+              *universal*) OUT="wgserve-universal.apk" ;;
+              *) continue ;;
+            esac
+            "$ANDROID_HOME/build-tools/32.0.0/apksigner" sign --ks wgserve-release.jks --ks-key-alias wgserve --ks-pass pass:"$STORE_PASSWORD" --key-pass pass:"$KEY_PASSWORD" --out "app/build/outputs/apk/release/$OUT" "$APK"
+            "$ANDROID_HOME/build-tools/32.0.0/apksigner" verify --verbose "app/build/outputs/apk/release/$OUT"
+          done
+      - uses: actions/upload-artifact@v4
         with:
-          name: wgserve-armv7-apk
-          path: app/build/outputs/apk/release/wgserve-armv7.apk
-          if-no-files-found: error
-
-      - name: Create GitHub Release
+          name: wgserve-release-apks
+          path: |
+            app/build/outputs/apk/release/wgserve-armv7.apk
+            app/build/outputs/apk/release/wgserve-arm64.apk
+            app/build/outputs/apk/release/wgserve-universal.apk
+      - name: Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: armv7-build-${{ github.run_number }}
-          name: wgserve ARMv7 build ${{ github.run_number }}
-          prerelease: true
+          tag_name: v${{ github.run_number }}
+          name: wgserve v${{ github.run_number }}
+          prerelease: false
           generate_release_notes: true
-          files: app/build/outputs/apk/release/wgserve-armv7.apk
+          files: |
+            app/build/outputs/apk/release/wgserve-armv7.apk
+            app/build/outputs/apk/release/wgserve-arm64.apk
+            app/build/outputs/apk/release/wgserve-universal.apk
