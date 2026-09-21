@@ -5,6 +5,9 @@
             <solid android:color="#202020" />
         </shape>
     </item>
+
+    <!-- Android TV banner: 16:9 canvas with the existing icon centered.
+         The side margins use the same gray background as the banner. -->
     <item
         android:width="96dp"
         android:height="96dp"
