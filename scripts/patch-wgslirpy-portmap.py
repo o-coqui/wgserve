@@ -84,8 +84,7 @@ new = """                        TunnResult::Err(WireGuardError::ConnectionExpir
                                 self.keepalive_interval,
                                 0,
                                 None,
-                            )
-                            .map_err(|e| anyhow::anyhow!(e))?;
+                            );
                         }
                         TunnResult::Err(e) => {
                             error!("boringturn error: {:?}", e);
