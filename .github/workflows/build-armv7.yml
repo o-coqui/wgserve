@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - armv7-build
+      - boringtun-update-0.7
   workflow_dispatch:
 
 permissions:
