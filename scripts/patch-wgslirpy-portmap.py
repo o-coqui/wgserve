@@ -28,6 +28,13 @@ assert old in r
 r = r.replace(old, new, 1)
 router.write_text(r)
 
+# Test BoringTun 0.7.0. BoringTun 0.7.1 is intentionally not selected here because upstream issue #495 reports a session regression in the Tunn library API matching this application architecture.
+cargo = Path("wgslirpy/crates/libwgslirpy/Cargo.toml")
+cc = cargo.read_text()
+old = 'boringtun = "0.6.0"'
+assert old in cc
+cargo.write_text(cc.replace(old, 'boringtun = "0.7.0"', 1))
+
 old = """pub enum ServeTcpMode {\n    Outgoing,\n    Incoming {"""
 new = """pub enum ServeTcpMode {\n    Outgoing {\n        /// Actual host-side endpoint to connect to.\n        /// The externally visible endpoint remains the `external_addr` argument.\n        target_addr: IpEndpoint,\n    },\n    Incoming {"""
 assert old in s
