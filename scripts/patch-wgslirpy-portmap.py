@@ -64,6 +64,27 @@ serve_tcp.write_text(s)
 wg = Path("wgslirpy/crates/libwgslirpy/src/wg.rs")
 w = wg.read_text()
 
+# BoringTun 0.7.0: Tunn::new returns Tunn directly (not Result<Tunn, _>).
+old = """        let mut wg = boringtun::noise::Tunn::new(
+            self.private_key.clone(),
+            self.peer_key,
+            None,
+            self.keepalive_interval,
+            0,
+            None,
+        )
+        .map_err(|e| anyhow::anyhow!(e))?;"""
+new = """        let mut wg = boringtun::noise::Tunn::new(
+            self.private_key.clone(),
+            self.peer_key,
+            None,
+            self.keepalive_interval,
+            0,
+            None,
+        );"""
+assert old in w
+w = w.replace(old, new, 1)
+
 # Recreate only BoringTun's Tunn state after ConnectionExpired. Keep the
 # Tokio UDP socket, router and Android service alive; only the expired
 # WireGuard handshake/session state is replaced.
