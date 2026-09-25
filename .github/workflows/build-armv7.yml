@@ -18,11 +18,14 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - name: Install Android SDK components
         run: |
           set -e
           yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platform-tools" "platforms;android-32" "build-tools;32.0.0" "ndk;25.2.9519653"
+          sdkmanager "platforms;android-32" "build-tools;32.0.0" "ndk;25.2.9519653"
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: armv7-linux-androideabi,aarch64-linux-android
