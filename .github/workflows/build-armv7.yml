@@ -2,8 +2,8 @@ name: Build release APKs
 
 on:
   push:
-    branches:
-      - 'boringtun-update-0.7'
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 permissions:
