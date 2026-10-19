@@ -1,0 +1,59 @@
+#!/data/data/com.termux/files/usr/bin/sh
+
+PKG="org.vi_server.wgserver"
+TAG="WgServer"
+
+usage() {
+    echo "Uso: wgserve {start|stop|restart|status|log}"
+    echo
+    echo "  start    Inicia wgserve"
+    echo "  stop     Detee wgserve"
+    echo "  restart  Reinicia wgserve"
+    echo "  status   Mostra o estado"
+    echo "  log      Mostra o log dispoñible"
+    echo "  log -f   Segue o log en tempo real"
+}
+
+broadcast() {
+    am broadcast -a "$PKG.$1" -p "$PKG" 2>/dev/null |
+        sed -n 's/.*data="\([^"]*\)".*/\1/p'
+}
+
+case "$1" in
+    start)
+        broadcast START
+        ;;
+
+    stop)
+        broadcast STOP
+        ;;
+
+    restart)
+        broadcast STOP
+        sleep 1
+        broadcast START
+        ;;
+
+    status)
+        broadcast STATUS
+        ;;
+
+    log)
+        if [ "$2" = "-f" ]; then
+            adb shell logcat -s "$TAG:V" '*:S'
+        else
+            adb shell logcat -d -s "$TAG:V" '*:S'
+        fi
+        ;;
+
+    -h|--help|help|"")
+        usage
+        ;;
+
+    *)
+        echo "Erro: argumento descoñecido: $1" >&2
+        usage >&2
+        exit 1
+        ;;
+esac
+
